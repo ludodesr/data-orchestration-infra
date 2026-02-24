@@ -30,11 +30,14 @@ x-airflow-common:
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     # The following line can be used to set a custom config file, stored in the local config folder
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
+    #
+    AIRFLOW__CORE__DAGS_FOLDER: '/opt/airflow/git-sync/dags'
   volumes:
-    - ../airflow/dags:/opt/airflow/dags
-    - ../airflow/logs:/opt/airflow/logs
-    - ../airflow/config:/opt/airflow/config
-    - ../airflow/plugins:/opt/airflow/plugins
+    - airflow-volume:/opt/airflow
+#    - airflow-volume/dags:/opt/airflow/dags
+#    - airflow-volume/logs:/opt/airflow/logs
+#    - airflow-volume/config:/opt/airflow/config
+#    - airflow-volume/plugins:/opt/airflow/plugins
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -220,5 +223,11 @@ services:
 
 volumes:
   postgres-db-volume:
+    name: postgres-db-volume
   working-volume:
+    name: working-volume
+  airflow-volume:
+    name: airflow-volume
+  src-volume:
+    name: src-volume
 
