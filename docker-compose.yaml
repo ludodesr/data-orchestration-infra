@@ -31,13 +31,10 @@ x-airflow-common:
     # The following line can be used to set a custom config file, stored in the local config folder
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
     #
-    AIRFLOW__CORE__DAGS_FOLDER: '/opt/airflow/git-sync/dags'
+    AIRFLOW__CORE__DAGS_FOLDER: '/opt/airflow/github/repo/dags'
   volumes:
-    - airflow-volume:/opt/airflow
-#    - airflow-volume/dags:/opt/airflow/dags
-#    - airflow-volume/logs:/opt/airflow/logs
-#    - airflow-volume/config:/opt/airflow/config
-#    - airflow-volume/plugins:/opt/airflow/plugins
+    - ./airflow:/opt/airflow
+    - ./airflow/github:/opt/airflow/github
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -55,13 +52,14 @@ services:
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
-      - postgres-db-volume:/var/lib/postgresql/data
+      - db-volume:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 10s
       retries: 5
       start_period: 5s
     restart: always
+
 
   airflow-apiserver:
     <<: *airflow-common
@@ -81,6 +79,7 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
@@ -97,6 +96,7 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+
   airflow-dag-processor:
     <<: *airflow-common
     command: dag-processor
@@ -111,6 +111,7 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+
 
   airflow-init:
     <<: *airflow-common
@@ -221,14 +222,48 @@ services:
     restart: always
 
 
+  git-sync-dags:
+    image: registry.k8s.io/git-sync/git-sync:v4.3.0
+    user: "0:0"
+    environment:
+      - GITSYNC_REPO=git@github.com:ludodesr/data-orchestration-airflow.git
+      - GITSYNC_BRANCH=main
+      - GITSYNC_ROOT=/git
+      - GITSYNC_LINK=repo
+      - GITSYNC_WAIT=10
+      - GITSYNC_SSH=true
+      - GITSYNC_SSH_KEY_FILE=/root/.ssh/id_ed25519
+      - GITSYNC_SSH_KNOWN_HOSTS_FILE=/root/.ssh/known_hosts
+    volumes:
+      - ./airflow/github:/git
+      - ./.ssh/github/data-orchestration-airflow:/root/.ssh:ro
+
+
+  git-sync-src:
+    image: registry.k8s.io/git-sync/git-sync:v4.3.0
+    user: "0:0"
+    environment:
+      - GITSYNC_REPO=git@github.com:ludodesr/data-orchestration-src.git
+      - GITSYNC_BRANCH=main
+      - GITSYNC_ROOT=/git
+      - GITSYNC_LINK=repo
+      - GITSYNC_WAIT=10
+      - GITSYNC_SSH=true
+      - GITSYNC_SSH_KEY_FILE=/root/.ssh/id_ed25519
+      - GITSYNC_SSH_KNOWN_HOSTS_FILE=/root/.ssh/known_hosts
+    volumes:
+      - src-volume:/git
+      - ./.ssh/github/data-orchestration-src:/root/.ssh:ro
+
+
 volumes:
-  postgres-db-volume:
-    name: postgres-db-volume
-  working-volume:
-    name: working-volume
-  airflow-volume:
-    name: airflow-volume
+  db-volume:
+    name: db-volume
   src-volume:
     name: src-volume
+  wd-volume:
+    name: ww-volume
+
+
 
 
