@@ -1,3 +1,5 @@
+# name: airflow-${ENVIRONMENT:-no-env}
+
 x-airflow-common:
   &airflow-common
   image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.1.7}
@@ -7,17 +9,17 @@ x-airflow-common:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
-    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__FERNET_KEY: 'OuNyWo3g5cP6ndRSSJtt1PRbemtdL5XOM433aIOykWA='
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
-    AIRFLOW__CORE__DAGS_FOLDER: '/opt/airflow/github/repo/dags'
+    AIRFLOW__CORE__DAGS_FOLDER: '/opt/airflow/github/repo'
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL: 10
     AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 10
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
   volumes:
     - ./airflow:/opt/airflow
@@ -34,6 +36,7 @@ services:
 
   postgres:
     image: postgres:16
+    container_name: airflow-${ENVIRONMENT}-postgres
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -50,9 +53,10 @@ services:
 
   airflow-apiserver:
     <<: *airflow-common
+    container_name: airflow-${ENVIRONMENT}-api-server
     command: api-server
     ports:
-      - "8080:8080"
+      - "${API_SERVER_PORT}:8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
       interval: 30s
@@ -69,6 +73,7 @@ services:
 
   airflow-scheduler:
     <<: *airflow-common
+    container_name: airflow-${ENVIRONMENT}-scheduler
     command: scheduler
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
@@ -86,6 +91,7 @@ services:
 
   airflow-dag-processor:
     <<: *airflow-common
+    container_name: airflow-${ENVIRONMENT}-dag-processor
     command: dag-processor
     healthcheck:
       test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
@@ -102,8 +108,8 @@ services:
 
   airflow-init:
     <<: *airflow-common
+    container_name: airflow-${ENVIRONMENT}-init
     entrypoint: /bin/bash
-    # yamllint disable rule:line-length
     depends_on:
       postgres:
         condition: service_healthy    
@@ -198,6 +204,7 @@ services:
 
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:0.1.1
+    container_name: airflow-${ENVIRONMENT}-docker-socket-proxy
     environment:
       CONTAINERS: 1
       IMAGES: 1
@@ -211,9 +218,10 @@ services:
 
   git-sync-dags:
     image: registry.k8s.io/git-sync/git-sync:v4.3.0
+    container_name: airflow-${ENVIRONMENT}-git-sync-dags
     user: "0:0"
     environment:
-      - GITSYNC_REPO=git@github.com:ludodesr/data-orchestration-airflow.git
+      - GITSYNC_REPO=git@github.com:ludodesr/data-orchestration-airflow-dags.git
       - GITSYNC_BRANCH=main
       - GITSYNC_ROOT=/git
       - GITSYNC_LINK=repo
@@ -223,11 +231,12 @@ services:
       - GITSYNC_SSH_KNOWN_HOSTS_FILE=/root/.ssh/known_hosts
     volumes:
       - ./airflow/github:/git
-      - ./.ssh/github/data-orchestration-airflow:/root/.ssh:ro
+      - ./.ssh/github/data-orchestration-airflow-dags:/root/.ssh:ro
 
 
   git-sync-src:
     image: registry.k8s.io/git-sync/git-sync:v4.3.0
+    container_name: airflow-${ENVIRONMENT}-git-sync-src
     user: "0:0"
     environment:
       - GITSYNC_REPO=git@github.com:ludodesr/data-orchestration-src.git
@@ -245,12 +254,14 @@ services:
 
 volumes:
   db-volume:
-    name: db-volume
+    name: airflow-${ENVIRONMENT}-db-volume
   src-volume:
-    name: src-volume
+    name: airflow-${ENVIRONMENT}-src-volume
   wd-volume:
-    name: ww-volume
+    name: airflow-${ENVIRONMENT}-wd-volume
 
-
+networks:
+  default:
+    name: airflow-${ENVIRONMENT}-network
 
 
